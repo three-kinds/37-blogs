@@ -1,0 +1,9 @@
+# 37-blogs
+
+## 软件开发
+
+1. [PythonPackage开发相关的事儿](./00-software-development/00-PythonPackage开发相关的事儿.md)
+
+## 群控
+
+1. [小米6内核集成KernelSU](./09-group-control/00-小米6内核集成KernelSU.md)
