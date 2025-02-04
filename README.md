@@ -7,3 +7,4 @@
 ## 群控
 
 1. [小米6内核集成KernelSU](./09-group-control/00-小米6内核集成KernelSU.md)
+2. [Android-公网走移动数据，内网走WLAN](./09-group-control/01-Android-公网走移动数据，内网走WLAN.md)
