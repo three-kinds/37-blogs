@@ -25,8 +25,8 @@
 
 ### 2. 如何配置默认路由
 
-* 需要知道工作中的移动数据网卡`CCMNI_DEV`与其IP地址`CCMNI_IP`
-* 通过就可以设置默认路由了`ip route add default via ${CCMNI_IP} dev ${CCMNI_DEV}`
+* 需要知道工作中的移动数据网卡`NIC_DEV`与其IP地址`NIC_IP`
+* 通过就可以设置默认路由了`ip route add default via ${NIC_IP} dev ${NIC_DEV}`
 * 测试`ip route get 114.114.114.114`，发现还是走的WLAN
 * 推测与路由策略有关（ip rule），但我不懂android的默认路由策略，它有很多条
 * 我仿照电脑的2条路由策略，配置了一下，发现启效了，如下（如有更好的办法，欢迎老哥指点）
@@ -54,8 +54,8 @@
 
 DIR=${0%/*}
 # 如果有这个文件，则开启debug模式，会输出日志到文件
-FLAG_FILE="/data/local/tmp/ccmni-and-wlan.debug"
-LOG_FILE="/data/local/tmp/ccmni-and-wlan.log"
+FLAG_FILE="/data/local/tmp/nic-and-wlan.debug"
+LOG_FILE="/data/local/tmp/nic-and-wlan.log"
 DEBUG=false
 
 if [ -r $FLAG_FILE ]; then
@@ -68,6 +68,16 @@ slog() {
         echo "$(date '+%Y-%m-%d %H:%M:%S') $1" >> $LOG_FILE
     fi
 }
+
+# nic label, 高通与联发科的网卡名称不同
+NIC_LABEL="rmnet_data"
+cpu_info=$(cat /sys/firmware/devicetree/base/compatible)
+if [[ "$cpu_info" == *"mediatek"* ]]; then
+    NIC_LABEL="ccmni"
+    slog "联发科"
+else
+    slog "高通"
+fi
 
 LAST_WLAN0_DEV=""
 update_wlan0_route() {
@@ -88,36 +98,36 @@ update_wlan0_route() {
     LAST_WLAN0_DEV=$WLAN0_DEV    
 }
 
-LAST_CCMNI_DEV=""
-LAST_CCMNI_IP=""
-update_ccmni_route() {
-    # 获取当前工作中的 ccmni 设备
-    CCMNI_DEV=$(ip -o -4 addr show | grep ccmni | awk '{print $2}' | cut -d':' -f1)
-    CCMNI_IP=""
-    if [ -n "$CCMNI_DEV" ]; then
-        CCMNI_IP=$(ip addr show $CCMNI_DEV | grep "inet " | awk '{print $2}' | cut -d/ -f1)
+LAST_NIC_DEV=""
+LAST_NIC_IP=""
+update_nic_route() {
+    # 获取当前工作中的 nic 设备
+    NIC_DEV=$(ip -o -4 addr show | grep $NIC_LABEL | awk '{print $2}' | cut -d':' -f1)
+    NIC_IP=""
+    if [ -n "$NIC_DEV" ]; then
+        NIC_IP=$(ip addr show $NIC_DEV | grep "inet " | awk '{print $2}' | cut -d/ -f1)
     fi
 
-    if [[ "$CCMNI_DEV" == "$LAST_CCMNI_DEV" && "$CCMNI_IP" == "$LAST_CCMNI_IP" ]]; then
-        slog "ccmni没有变化"
+    if [[ "$NIC_DEV" == "$LAST_NIC_DEV" && "$NIC_IP" == "$LAST_NIC_IP" ]]; then
+        slog "nic没有变化"
     else
-        if [[ "$CCMNI_IP" == "" ]]; then
-            slog "[关闭]ccmni"
+        if [[ "$NIC_IP" == "" ]]; then
+            slog "[关闭]nic"
         else
-            slog "[打开]$CCMNI_DEV，配置相关路由"
+            slog "[打开]$NIC_DEV，配置相关路由"
             # 添加默认路由，指定设备
             ip route del default
-            ip route add default via ${CCMNI_IP} dev ${CCMNI_DEV}
+            ip route add default via ${NIC_IP} dev ${NIC_DEV}
         fi
     fi
 
-    LAST_CCMNI_DEV=$CCMNI_DEV
-    LAST_CCMNI_IP=$CCMNI_IP
+    LAST_NIC_DEV=$NIC_DEV
+    LAST_NIC_IP=$NIC_IP
 }
 
 # 当只有wlan在工作时，则通过 lo 锁定默认路由，达到锁网效果
 check_need_lock_network() {
-    if [[ "$LAST_WLAN0_DEV" != "" && "$LAST_CCMNI_IP" == "" ]]; then
+    if [[ "$LAST_WLAN0_DEV" != "" && "$LAST_NIC_IP" == "" ]]; then
         if [[ "$(ip route get 8.8.8.8 | grep "dev lo src")" == "" ]]; then
             slog "[锁网]只有wlan0"
             ip route del default
@@ -136,10 +146,10 @@ while true; do
     # 使用 ip monitor 监听 rule 变化
     ip monitor rule | while read -r line; do
         # 检查是否匹配到关注的规则
-        if  [[ "$line" == *"from all iif lo oif wlan0 uidrange 0-0 lookup"* ]] || [[ "$line" == *"from all iif lo oif ccmni"* ]]; then
+        if  [[ "$line" == *"from all iif lo oif wlan0 uidrange 0-0 lookup"* ]] || [[ "$line" == *"from all iif lo oif nic"* ]]; then
             slog "匹配到规则: $line"
             update_wlan0_route
-            update_ccmni_route
+            update_nic_route
             # 可选：当不想让设备通过WLAN访问公网时启用
             check_need_lock_network
         fi
