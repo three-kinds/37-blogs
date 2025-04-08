@@ -3,6 +3,7 @@
 ## 软件开发
 
 1. [PythonPackage开发相关的事儿](./00-software-development/00-PythonPackage开发相关的事儿.md)
+2. [好用的爬虫采集系统](./00-software-development/01-好用的爬虫采集系统.md)
 
 ## 群控
 
